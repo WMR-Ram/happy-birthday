@@ -1,0 +1,271 @@
+<html>
+<head>
+  <title>生日快乐YHX</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to right, #00b4db, #ff8bf5);
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 60px;
+      color: white;
+      text-shadow: 2px 2px 4px black;
+      margin-top: 100px;
+    }
+
+    p {
+      text-align: center;
+      font-size: 30px;
+      color: white;
+      text-shadow: 1px 1px 2px black;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* 新增的样式 */
+    .typed-cursor {
+      opacity: 1;
+      animation: blink 0.7s infinite;
+    }
+
+    @keyframes blink {
+      0% { opacity: 1; }
+      50% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+
+    /* 新增的样式 */
+    #days {
+      text-align: center;
+      font-size: 20px;
+      color: white;
+      text-shadow: 1px 1px 2px black;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Happy Birthday!</h1>
+  <!-- 修改了p标签的内容，加入了span标签 -->
+  <p>Wishing you a wonderful day and a year filled with happiness!<br><span id="typed"></span></p>
+  <canvas id="canvas"></canvas>
+  <!-- 新增的div标签，用来显示已出生的天数 -->
+  <div id="days"></div>
+  <script>
+    // Adapted from https://codepen.io/whqet/pen/Auzch
+    var canvas = document.getElementById("canvas");
+    var ctx = canvas.getContext("2d");
+    var cw = canvas.width = window.innerWidth;
+    var ch = canvas.height = window.innerHeight;
+    var fireworks = [];
+    var particles = [];
+    var hue = 120;
+    var limiter = 5;
+    var timer = 0;
+    var mx;
+    var my;
+
+    function random(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    function calculateDistance(p1x, p1y, p2x, p2y) {
+      var xDistance = p1x - p2x;
+      var yDistance = p1y - p2y;
+      return Math.sqrt(Math.pow(xDistance, 2) + Math.pow(yDistance, 2));
+    }
+
+    function Firework(sx, sy, tx, ty) {
+      this.x = sx;
+      this.y = sy;
+      this.sx = sx;
+      this.sy = sy;
+      this.tx = tx;
+      this.ty = ty;
+      this.distanceToTarget = calculateDistance(sx, sy, tx, ty);
+      this.distanceTraveled = 0;
+      this.coordinates = [];
+      this.coordinateCount = 3;
+      while (this.coordinateCount--) {
+        this.coordinates.push([this.x, this.y]);
+      }
+      this.angle = Math.atan2(ty - sy, tx - sx);
+      this.speed = 2;
+      this.acceleration = 1.05;
+      this.brightness = random(50, 70);
+      this.targetRadius = 1;
+    }
+
+    Firework.prototype.update = function(index) {
+      this.coordinates.pop();
+      this.coordinates.unshift([this.x, this.y]);
+      if (this.targetRadius < 8) {
+        this.targetRadius += 0.3;
+      } else {
+        this.targetRadius = 1;
+      }
+      this.speed *= this.acceleration;
+      var vx = Math.cos(this.angle) * this.speed;
+      var vy = Math.sin(this.angle) * this.speed;
+      this.distanceTraveled = calculateDistance(this.sx, this.sy, this.x + vx, this.y + vy);
+      if (this.distanceTraveled >= this.distanceToTarget) {
+        createParticles(this.tx, this.ty);
+        fireworks.splice(index, 1);
+      } else {
+        this.x += vx;
+        this.y += vy;
+      }
+    }
+
+    Firework.prototype.draw = function() {
+      ctx.beginPath();
+      ctx.moveTo(this.coordinates[this.coordinates.length - 1][0], this.coordinates[this.coordinates.length - 1][1]);
+      ctx.lineTo(this.x, this.y);
+      ctx.strokeStyle = 'hsl(' + hue + ', 100%, ' + this.brightness + '%)';
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(this.tx, this.ty, this.targetRadius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    function Particle(x, y) {
+      this.x = x;
+      this.y = y;
+      this.coordinates = [];
+      this.coordinateCount = 5;
+      while (this.coordinateCount--) {
+        this.coordinates.push([this.x, this.y]);
+      }
+      this.angle = random(0, Math.PI * 2);
+      this.speed = random(1, 10);
+      this.friction = 0.95;
+      this.gravity = 1;
+      this.hue = random(hue - 20, hue + 20);
+      this.brightness = random(50, 80);
+      this.alpha = 1;
+      this.decay = random(0.015, 0.03);
+    }
+
+    Particle.prototype.update = function(index) {
+      this.coordinates.pop();
+      this.coordinates.unshift([this.x, this.y]);
+      this.speed *= this.friction;
+      this.x += Math.cos(this.angle) * this.speed;
+      this.y += Math.sin(this.angle) * this.speed + this.gravity;
+      this.alpha -= this.decay;
+      if (this.alpha <= this.decay) {
+        particles.splice(index, 1);
+      }
+    }
+
+    Particle.prototype.draw = function() {
+      ctx.beginPath();
+      ctx.moveTo(this.coordinates[this.coordinates.length - 1][0], this.coordinates[this.coordinates.length - 1][1]);
+      ctx.lineTo(this.x, this.y);
+      ctx.strokeStyle = 'hsla(' + this.hue + ', 100%, ' + this.brightness + '%, ' + this.alpha + ')';
+      ctx.stroke();
+    }
+
+    function createParticles(x, y) {
+      var particleCount = 30;
+      while (particleCount--) {
+        particles.push(new Particle(x, y));
+      }
+    }
+
+    function loop() {
+      requestAnimationFrame(loop);
+      hue += 0.5;
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.globalCompositeOperation = 'lighter';
+      var i = fireworks.length;
+      while (i--) {
+        fireworks[i].draw();
+        fireworks[i].update(i);
+      }
+      var i = particles.length;
+      while (i--) {
+        particles[i].draw();
+        particles[i].update(i);
+      }
+      if (timer % 15 == 0) {
+        fireworks.push(new Firework(cw / 2, ch, random(0, cw), random(0, ch / 2)));
+      }
+      timer++;
+    }
+
+    window.onload = loop;
+
+    // 新增的脚本
+    // 引入typed.js库
+    var script = document.createElement('script');
+    script.src = 'https://cdn.bootcdn.net/ajax/libs/typed.js/2.0.12/typed.min.js';
+    document.head.appendChild(script);
+
+    // 定义想说的话
+    var greetings = [
+      'Ram在此祝你',
+      '身体健康',
+      '天天开心',
+      '抽卡不歪',
+      '十连十个金',
+      '生日快乐！'
+    ];
+
+    // 等待typed.js加载完成后执行
+    script.onload = function() {
+      // 创建一个typed对象
+      var typed = new Typed('#typed', {
+        // 指定要显示的字符串数组
+        strings: greetings,
+        // 指定每个字符串的停留时间
+        typeSpeed: 100,
+        // 指定每个字符串的删除速度
+        // 修改了这里，把backSpeed设置为0
+        backSpeed: 0,
+        // 指定循环的次数，为false则无限循环
+        loopCount: false,
+                // 指定是否显示光标
+                showCursor: true,
+        // 指定光标的字符
+        cursorChar: '|',
+        // 指定是否自动开始
+        autoStart: true
+      });
+    };
+
+    // 新增的脚本，用来计算和显示已出生的天数
+    // 定义你的朋友的出生日期，格式为年-月-日
+    var birthday = '2009-01-027';
+    // 创建一个Date对象，表示你的朋友的出生日期
+    var birthDate = new Date(birthday);
+    // 创建一个Date对象，表示当前的日期
+    var currentDate = new Date();
+    // 计算两个日期之间的毫秒数差
+    var diff = currentDate.getTime() - birthDate.getTime();
+    // 计算两个日期之间的天数差
+    var days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    // 获取显示天数的div元素
+    var daysDiv = document.getElementById('days');
+    // 设置显示天数的div元素的内容
+    daysDiv.innerHTML = 'YHX已经诞生' + days + '天';
+  </script>
+</body>
+<!-- copyright -->
+<footer style="color: #BBE1FA; text-align:center;">
+  <font size="2" color=#BBE1FA>2024 生日快乐 &nbsp 我的朋友 &nbsp by Ram</font>
+</footer>
+<audio id="music" src="./happybirthday.m4a" autoplay preload="auto" loop="loop">该浏览器不支持audio属性</audio>
+</html>
